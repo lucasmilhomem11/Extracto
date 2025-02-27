@@ -43,32 +43,49 @@ extract_file() {
         exit 0
     fi
 
-    # If the file is a ZIP archive, attempt to extract using unzip and bsdtar
+    # If the file is a ZIP archive, attempt extraction using both unzip and 7z
     if [[ "$FILE_TYPE" == *"Zip archive data"* ]]; then
         echo "ZIP archive detected. Attempting extraction..."
 
-        # Check if a password is needed
+        # Check if unzip needs a password
         unzip -t "$FILE_PATH" 2>&1 | grep -q "incorrect password"
         if [ $? -eq 0 ]; then
             if [ -z "$PASSWORD" ]; then
                 read -s -p "Enter password for ZIP file: " PASSWORD
-                echo
+                echo "No Password Detected..."
             fi
         fi
 
-        # Try extracting with unzip
+        # Try extracting with unzip first
+        echo "Trying unzip..."
         if unzip -P "$PASSWORD" "$FILE_PATH" -d "$OUTPUT_DIR"; then
+            echo "Extraction successful with unzip: $OUTPUT_DIR"
+            exit 0
+        else
+            echo "unzip failed. Trying 7z..."
+
+            # Try extracting with 7z if unzip failed
+            if 7z x -p"$PASSWORD" "$FILE_PATH" -o"$OUTPUT_DIR"; then
+                echo "Extraction successful with 7z: $OUTPUT_DIR"
+                exit 0
+            else
+                echo "7z extraction failed. Check file format or password."
+                exit 1
+            fi
+        fi
+    fi
+
+    # If the file is a 7-zip archive, extract using 7z
+    if [[ "$FILE_TYPE" == *"7-zip archive"* ]]; then
+        echo "7-zip archive detected. Attempting extraction..."
+
+        # Try extracting with 7z
+        if 7z x -p"$PASSWORD" "$FILE_PATH" -o"$OUTPUT_DIR"; then
             echo "Extraction successful: $OUTPUT_DIR"
             exit 0
         else
-            echo "unzip failed. Trying bsdtar...Wait a few minutes, depending on the file size it may take a little..."
-            if bsdtar -xvf "$FILE_PATH" --passphrase "$PASSWORD" -C "$OUTPUT_DIR"; then
-                echo "Extraction successful: $OUTPUT_DIR"
-                exit 0
-            else
-                echo "Extraction failed. Check file format or if file requires a password."
-                exit 1
-            fi
+            echo "7z extraction failed. Check file format or password."
+            exit 1
         fi
     fi
 
