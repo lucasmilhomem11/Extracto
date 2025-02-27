@@ -19,6 +19,9 @@ extract_file() {
     FILE_TYPE=$(file -b "$FILE_PATH")
     echo "Current file type: $FILE_TYPE"
 
+    # Ensure the output directory exists
+    mkdir -p "$OUTPUT_DIR"
+
     # If the file is gzipped, decompress it
     if [[ "$FILE_TYPE" == *"gzip compressed data"* ]]; then
         echo "Decompressing gzipped file..."
@@ -47,30 +50,47 @@ extract_file() {
     if [[ "$FILE_TYPE" == *"Zip archive data"* ]]; then
         echo "ZIP archive detected. Attempting extraction..."
 
-        # Check if unzip needs a password
-        unzip -t "$FILE_PATH" 2>&1 | grep -q "incorrect password"
-        if [ $? -eq 0 ]; then
-            if [ -z "$PASSWORD" ]; then
-                read -s -p "Enter password for ZIP file: " PASSWORD
-                echo "No Password Detected..."
-            fi
+        # Check if a password is needed
+        if [[ -z "$PASSWORD" ]]; then
+            echo "This ZIP file requires a password."
+            read -s -p "Enter password: " PASSWORD
+            echo ""
         fi
+        
 
         # Try extracting with unzip first
         echo "Trying unzip..."
-        if unzip -P "$PASSWORD" "$FILE_PATH" -d "$OUTPUT_DIR"; then
-            echo "Extraction successful with unzip: $OUTPUT_DIR"
-            exit 0
-        else
-            echo "unzip failed. Trying 7z..."
-
-            # Try extracting with 7z if unzip failed
-            if 7z x -p"$PASSWORD" "$FILE_PATH" -o"$OUTPUT_DIR"; then
-                echo "Extraction successful with 7z: $OUTPUT_DIR"
+        if [[ -n "$PASSWORD" ]]; then
+            if unzip -P "$PASSWORD" "$FILE_PATH" -d "$OUTPUT_DIR"; then
+                echo "Extraction successful with unzip: $OUTPUT_DIR"
                 exit 0
             else
-                echo "7z extraction failed. Check file format or password."
-                exit 1
+                echo "unzip failed. Trying 7z..."
+
+                # Try extracting with 7z if unzip failed
+                if 7z x -p"$PASSWORD" -o"$OUTPUT_DIR" "$FILE_PATH" -y; then
+                    echo "Extraction successful with 7z: $OUTPUT_DIR"
+                    exit 0
+                else
+                    echo "7z extraction failed. Check file format or password."
+                    exit 1
+                fi
+            fi
+        else
+            if unzip "$FILE_PATH" -d "$OUTPUT_DIR"; then
+                echo "Extraction successful with unzip: $OUTPUT_DIR"
+                exit 0
+            else
+                echo "unzip failed. Trying 7z..."
+
+                # Try extracting with 7z if unzip failed
+                if 7z x -o"$OUTPUT_DIR" "$FILE_PATH" -y; then
+                    echo "Extraction successful with 7z: $OUTPUT_DIR"
+                    exit 0
+                else
+                    echo "7z extraction failed. Check file format or password."
+                    exit 1
+                fi
             fi
         fi
     fi
@@ -79,8 +99,15 @@ extract_file() {
     if [[ "$FILE_TYPE" == *"7-zip archive"* ]]; then
         echo "7-zip archive detected. Attempting extraction..."
 
+        # Ensure password is set if required
+        if [[ -z "$PASSWORD" ]]; then
+            echo "This 7z file may require a password."
+            read -s -p "Enter password: " PASSWORD
+            echo ""
+        fi
+
         # Try extracting with 7z
-        if 7z x -p"$PASSWORD" "$FILE_PATH" -o"$OUTPUT_DIR"; then
+        if 7z x -p"$PASSWORD" -o"$OUTPUT_DIR" "$FILE_PATH" -y; then
             echo "Extraction successful: $OUTPUT_DIR"
             exit 0
         else
