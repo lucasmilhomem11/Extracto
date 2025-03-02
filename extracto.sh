@@ -8,7 +8,7 @@ fi
 
 # Path to the file you want to check and process (from command-line argument)
 FILE_PATH="$1"
-OUTPUT_DIR="$HOME/Downloads"
+OUTPUT_DIR="$HOME/downloads"
 PASSWORD="$2"
 
 # Ensure the output directory exists
